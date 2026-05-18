@@ -1,0 +1,633 @@
+
+<h2 class="sr-only">AI-Based Intrusion Detection System — SIEM-style security dashboard showing 40,000 network events with attack classification, anomaly detection, and real-time simulation.</h2>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+
+.ids-root { padding: 1rem 0; }
+
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 1.25rem; padding-bottom: 1rem;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.top-bar-left { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 32px; height: 32px; background: #E24B4A; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.logo-icon i { font-size: 18px; color: #fff; }
+.top-title { font-size: 15px; font-weight: 500; color: var(--color-text-primary); }
+.top-sub { font-size: 12px; color: var(--color-text-secondary); }
+.status-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-success); background: var(--color-background-success); border-radius: 20px; padding: 4px 12px; }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: #27500A; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.nav-tabs { display: flex; gap: 4px; margin-bottom: 1.25rem; border-bottom: 0.5px solid var(--color-border-tertiary); padding-bottom: 0; }
+.nav-tab { padding: 8px 16px; font-size: 13px; cursor: pointer; border: none; background: none; color: var(--color-text-secondary); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.nav-tab.active { color: var(--color-text-primary); border-bottom-color: #E24B4A; font-weight: 500; }
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+.metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+.metric-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px; }
+.metric-label { font-size: 11px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+.metric-value { font-size: 24px; font-weight: 500; color: var(--color-text-primary); }
+.metric-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.full-col { margin-bottom: 12px; }
+
+.card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px 16px; }
+.card-title { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+
+.legend-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 12px; color: var(--color-text-secondary); }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+.threat-list { display: flex; flex-direction: column; gap: 8px; }
+.threat-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); font-size: 12px; }
+.threat-ip { font-family: var(--font-mono); color: var(--color-text-primary); flex: 1; font-size: 11px; }
+.badge { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
+.badge-ddos { background: #FCEBEB; color: #A32D2D; }
+.badge-malware { background: #FAEEDA; color: #633806; }
+.badge-intrusion { background: #EEEDFE; color: #3C3489; }
+.badge-high { background: #FCEBEB; color: #791F1F; }
+.badge-medium { background: #FAEEDA; color: #854F0B; }
+.badge-low { background: #EAF3DE; color: #3B6D11; }
+.badge-blocked { background: #FCEBEB; color: #A32D2D; }
+.badge-logged { background: #E6F1FB; color: #185FA5; }
+.badge-ignored { background: var(--color-background-secondary); color: var(--color-text-secondary); }
+
+.score-bar-wrap { flex: 1; }
+.score-bar-track { height: 5px; background: var(--color-border-tertiary); border-radius: 3px; overflow: hidden; }
+.score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+.model-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.model-card { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px; }
+.model-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 4px; }
+.model-type { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 12px; }
+.model-metric { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+.model-metric-label { color: var(--color-text-secondary); }
+.model-metric-val { font-weight: 500; color: var(--color-text-primary); }
+.acc-bar { height: 8px; border-radius: 4px; margin-top: 10px; }
+
+.feat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; }
+.feat-name { width: 130px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feat-bar-track { flex: 1; height: 8px; background: var(--color-background-secondary); border-radius: 4px; overflow: hidden; }
+.feat-bar-fill { height: 100%; border-radius: 4px; background: #E24B4A; }
+.feat-val { width: 40px; text-align: right; font-weight: 500; color: var(--color-text-primary); }
+
+.sim-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.sim-event { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: var(--border-radius-md); background: var(--color-background-secondary); font-size: 12px; border-left: 3px solid transparent; animation: slideIn 0.3s ease; }
+.sim-event.ev-ddos { border-left-color: #E24B4A; }
+.sim-event.ev-malware { border-left-color: #BA7517; }
+.sim-event.ev-intrusion { border-left-color: #534AB7; }
+.sim-event.ev-normal { border-left-color: #3B6D11; }
+@keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+.sim-time { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); width: 80px; }
+.sim-ip { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-primary); flex: 1; }
+.sim-score { font-size: 11px; font-weight: 500; }
+
+.ae-canvas-wrap { position: relative; width: 100%; height: 220px; }
+.chart-wrap { position: relative; width: 100%; height: 240px; }
+.chart-wrap-tall { position: relative; width: 100%; height: 280px; }
+
+select { font-size: 12px; padding: 4px 8px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); }
+button { font-size: 12px; padding: 5px 14px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; }
+button:hover { background: var(--color-background-secondary); }
+button.primary { background: #E24B4A; color: #fff; border-color: #E24B4A; }
+button.primary:hover { background: #A32D2D; }
+</style>
+
+<div class="ids-root">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="logo-icon"><i class="ti ti-shield-lock" aria-hidden="true"></i></div>
+      <div>
+        <div class="top-title">AI Intrusion Detection System</div>
+        <div class="top-sub">Network Security Analytics · 40,000 events · Kaggle Dataset</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div class="status-badge"><span class="pulse"></span>Live Monitoring</div>
+    </div>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard" style="margin-right:4px;font-size:13px"></i>Overview</button>
+    <button class="nav-tab" onclick="switchTab('models')"><i class="ti ti-cpu" style="margin-right:4px;font-size:13px"></i>ML Models</button>
+    <button class="nav-tab" onclick="switchTab('traffic')"><i class="ti ti-wave-sine" style="margin-right:4px;font-size:13px"></i>Traffic Analysis</button>
+    <button class="nav-tab" onclick="switchTab('realtime')"><i class="ti ti-radio" style="margin-right:4px;font-size:13px"></i>Real-time Sim</button>
+  </div>
+
+  <!-- OVERVIEW PANEL -->
+  <div class="panel active" id="panel-overview">
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label"><i class="ti ti-database" style="font-size:13px" aria-hidden="true"></i>Total Events</div>
+        <div class="metric-value">40,000</div>
+        <div class="metric-sub">Network packets analyzed</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label"><i class="ti ti-alert-triangle" style="font-size:13px;color:#E24B4A" aria-hidden="true"></i>Attack Rate</div>
+        <div class="metric-value" style="color:#E24B4A">100%</div>
+        <div class="metric-sub">13,428 DDoS · 13,307 Malware</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label"><i class="ti ti-activity" style="font-size:13px" aria-hidden="true"></i>Avg Anomaly Score</div>
+        <div class="metric-value">50.1</div>
+        <div class="metric-sub">Uniform distribution 0–100</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label"><i class="ti ti-shield-check" style="font-size:13px" aria-hidden="true"></i>XGBoost Accuracy</div>
+        <div class="metric-value" style="color:#3B6D11">99.97%</div>
+        <div class="metric-sub">IsoForest: 48.9%</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-chart-pie" aria-hidden="true"></i>Attack type distribution</div>
+        <div class="legend-row">
+          <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>DDoS 33.6%</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#BA7517"></span>Malware 33.3%</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#534AB7"></span>Intrusion 33.2%</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chartAttackDist" role="img" aria-label="Donut chart: DDoS 13428, Malware 13307, Intrusion 13265">DDoS 13428, Malware 13307, Intrusion 13265</canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-chart-bar" aria-hidden="true"></i>Severity vs action taken</div>
+        <div class="legend-row">
+          <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>Blocked</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#185FA5"></span>Logged</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#888780"></span>Ignored</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chartSeverityAction" role="img" aria-label="Grouped bar chart of severity vs action taken">Severity vs action taken distribution</canvas></div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-clock" aria-hidden="true"></i>Hourly attack timeline</div>
+        <div class="legend-row">
+          <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>DDoS</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#BA7517"></span>Malware</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#534AB7"></span>Intrusion</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chartHourly" role="img" aria-label="Line chart of hourly attack counts over 24 hours">Hourly attack distribution over 24 hours</canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-topology-star-3" aria-hidden="true"></i>Protocol &amp; traffic breakdown</div>
+        <div class="legend-row">
+          <span class="legend-item"><span class="legend-dot" style="background:#378ADD"></span>ICMP</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#1D9E75"></span>UDP</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#D4537E"></span>TCP</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chartProtocol" role="img" aria-label="Donut chart of protocol distribution">Protocol distribution: ICMP, UDP, TCP</canvas></div>
+      </div>
+    </div>
+
+    <div class="card full-col">
+      <div class="card-title" style="justify-content:space-between;">
+        <span><i class="ti ti-list" aria-hidden="true"></i>Recent threat events</span>
+        <span style="font-size:11px;color:var(--color-text-secondary)">Latest 8 events from dataset</span>
+      </div>
+      <div class="threat-list" id="threatList"></div>
+    </div>
+  </div>
+
+  <!-- ML MODELS PANEL -->
+  <div class="panel" id="panel-models">
+    <div class="model-grid" style="margin-bottom:12px;">
+      <div class="model-card">
+        <div class="model-name">XGBoost Classifier</div>
+        <div class="model-type">Supervised · Binary Classification</div>
+        <div class="model-metric"><span class="model-metric-label">Accuracy</span><span class="model-metric-val" style="color:#3B6D11">99.97%</span></div>
+        <div class="model-metric"><span class="model-metric-label">Precision (attack)</span><span class="model-metric-val">1.00</span></div>
+        <div class="model-metric"><span class="model-metric-label">Recall (attack)</span><span class="model-metric-val">1.00</span></div>
+        <div class="model-metric"><span class="model-metric-label">F1 Score</span><span class="model-metric-val">1.00</span></div>
+        <div class="model-metric"><span class="model-metric-label">Estimators</span><span class="model-metric-val">200</span></div>
+        <div class="acc-bar" style="background:#EAF3DE;"><div style="width:99.97%;height:8px;border-radius:4px;background:#639922;"></div></div>
+      </div>
+      <div class="model-card">
+        <div class="model-name">Isolation Forest</div>
+        <div class="model-type">Unsupervised · Anomaly Detection</div>
+        <div class="model-metric"><span class="model-metric-label">Accuracy</span><span class="model-metric-val" style="color:#854F0B">48.9%</span></div>
+        <div class="model-metric"><span class="model-metric-label">Precision (attack)</span><span class="model-metric-val">0.86</span></div>
+        <div class="model-metric"><span class="model-metric-label">Recall (attack)</span><span class="model-metric-val">0.50</span></div>
+        <div class="model-metric"><span class="model-metric-label">F1 Score</span><span class="model-metric-val">0.63</span></div>
+        <div class="model-metric"><span class="model-metric-label">Contamination</span><span class="model-metric-val">0.50</span></div>
+        <div class="acc-bar" style="background:#FAEEDA;"><div style="width:48.9%;height:8px;border-radius:4px;background:#BA7517;"></div></div>
+      </div>
+      <div class="model-card">
+        <div class="model-name">Autoencoder (AE)</div>
+        <div class="model-type">Deep Learning · Reconstruction Error</div>
+        <div class="model-metric"><span class="model-metric-label">Normal MSE</span><span class="model-metric-val" style="color:#3B6D11">0.018</span></div>
+        <div class="model-metric"><span class="model-metric-label">DDoS MSE</span><span class="model-metric-val" style="color:#E24B4A">0.183</span></div>
+        <div class="model-metric"><span class="model-metric-label">Malware MSE</span><span class="model-metric-val" style="color:#E24B4A">0.247</span></div>
+        <div class="model-metric"><span class="model-metric-label">Threshold</span><span class="model-metric-val">0.07</span></div>
+        <div class="model-metric"><span class="model-metric-label">Architecture</span><span class="model-metric-val">8→4→8</span></div>
+        <div class="acc-bar" style="background:#EEEDFE;"><div style="width:87%;height:8px;border-radius:4px;background:#7F77DD;"></div></div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-arrows-sort" aria-hidden="true"></i>XGBoost feature importance</div>
+        <div id="featImportance"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-chart-scatter" aria-hidden="true"></i>Autoencoder reconstruction error</div>
+        <div class="legend-row">
+          <span class="legend-item"><span class="legend-dot" style="background:#639922"></span>Normal</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>DDoS</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#BA7517"></span>Malware</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#534AB7"></span>Intrusion</span>
+        </div>
+        <div class="ae-canvas-wrap"><canvas id="chartAE" role="img" aria-label="Box plot of autoencoder reconstruction error by class">Reconstruction error by class: Normal lowest, attacks significantly higher</canvas></div>
+      </div>
+    </div>
+
+    <div class="card full-col">
+      <div class="card-title"><i class="ti ti-layout-grid" aria-hidden="true"></i>Confusion matrix — XGBoost (test set, 9,000 samples)</div>
+      <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
+        <div>
+          <table style="border-collapse:collapse;font-size:12px;">
+            <tr>
+              <td style="width:80px;"></td>
+              <td style="padding:6px 16px;text-align:center;font-weight:500;color:var(--color-text-secondary);font-size:11px;">Pred Normal</td>
+              <td style="padding:6px 16px;text-align:center;font-weight:500;color:var(--color-text-secondary);font-size:11px;">Pred Attack</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 8px;font-size:11px;color:var(--color-text-secondary);font-weight:500;">Act Normal</td>
+              <td style="padding:12px 24px;text-align:center;background:#EAF3DE;border-radius:4px;font-weight:500;font-size:16px;color:#27500A;">1,034</td>
+              <td style="padding:12px 24px;text-align:center;background:#FCEBEB;border-radius:4px;font-weight:500;font-size:16px;color:#791F1F;">0</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 8px;font-size:11px;color:var(--color-text-secondary);font-weight:500;">Act Attack</td>
+              <td style="padding:12px 24px;text-align:center;background:#FCEBEB;border-radius:4px;font-weight:500;font-size:16px;color:#791F1F;">3</td>
+              <td style="padding:12px 24px;text-align:center;background:#EAF3DE;border-radius:4px;font-weight:500;font-size:16px;color:#27500A;">7,963</td>
+            </tr>
+          </table>
+          <div style="margin-top:10px;font-size:11px;color:var(--color-text-secondary);">Note: Synthetic normal traffic added for balanced evaluation</div>
+        </div>
+        <div style="flex:1;min-width:200px;">
+          <div class="feat-row"><span style="font-size:12px;color:var(--color-text-secondary);">True Positive Rate (Sensitivity)</span><span style="font-weight:500;color:#3B6D11;">99.96%</span></div>
+          <div class="feat-row"><span style="font-size:12px;color:var(--color-text-secondary);">True Negative Rate (Specificity)</span><span style="font-weight:500;color:#3B6D11;">100%</span></div>
+          <div class="feat-row"><span style="font-size:12px;color:var(--color-text-secondary);">False Positive Rate</span><span style="font-weight:500;color:#639922;">0.00%</span></div>
+          <div class="feat-row"><span style="font-size:12px;color:var(--color-text-secondary);">False Negative Rate</span><span style="font-weight:500;color:#639922;">0.04%</span></div>
+          <div class="feat-row"><span style="font-size:12px;color:var(--color-text-secondary);">MCC Score</span><span style="font-weight:500;">0.9994</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRAFFIC ANALYSIS PANEL -->
+  <div class="panel" id="panel-traffic">
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-chart-histogram" aria-hidden="true"></i>Anomaly score distribution per attack</div>
+        <div class="legend-row">
+          <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>DDoS</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#BA7517"></span>Malware</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#534AB7"></span>Intrusion</span>
+        </div>
+        <div class="chart-wrap-tall"><canvas id="chartAnomalyDist" role="img" aria-label="Histogram of anomaly scores by attack type">Anomaly score distribution: all attacks uniformly spread 0-100</canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-ruler" aria-hidden="true"></i>Packet length by attack type</div>
+        <div class="chart-wrap-tall"><canvas id="chartPacketLen" role="img" aria-label="Box plot of packet length by attack type">Packet length distribution across DDoS, Malware, and Intrusion</canvas></div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-network" aria-hidden="true"></i>Network segment exposure</div>
+        <div class="legend-row">
+          <span class="legend-item"><span class="legend-dot" style="background:#378ADD"></span>Segment A</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span>Segment B</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#534AB7"></span>Segment C</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chartSegment" role="img" aria-label="Donut chart of network segment exposure">Network segment attack distribution</canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-chart-bar" aria-hidden="true"></i>Traffic type vs attack type heatmap</div>
+        <div class="chart-wrap"><canvas id="chartHeatmap" role="img" aria-label="Grouped bar of traffic type vs attack type">Traffic type cross-tab with attack types</canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REALTIME PANEL -->
+  <div class="panel" id="panel-realtime">
+    <div class="metrics-grid" style="margin-bottom:12px;">
+      <div class="metric-card"><div class="metric-label"><i class="ti ti-bolt" style="font-size:13px" aria-hidden="true"></i>Packets/sec</div><div class="metric-value" id="rtPps">0</div><div class="metric-sub">Simulated rate</div></div>
+      <div class="metric-card"><div class="metric-label"><i class="ti ti-alert-triangle" style="font-size:13px;color:#E24B4A" aria-hidden="true"></i>Threats detected</div><div class="metric-value" style="color:#E24B4A" id="rtThreats">0</div><div class="metric-sub">This session</div></div>
+      <div class="metric-card"><div class="metric-label"><i class="ti ti-shield-x" style="font-size:13px" aria-hidden="true"></i>Blocked</div><div class="metric-value" id="rtBlocked">0</div><div class="metric-sub">Auto-blocked</div></div>
+      <div class="metric-card"><div class="metric-label"><i class="ti ti-activity" style="font-size:13px" aria-hidden="true"></i>Avg anomaly</div><div class="metric-value" id="rtAnomaly">—</div><div class="metric-sub">Current window</div></div>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-title" style="justify-content:space-between;">
+        <span><i class="ti ti-radio" aria-hidden="true"></i>Packet capture simulation (Scapy-style)</span>
+        <div class="sim-controls" style="margin-bottom:0;">
+          <select id="simMode"><option value="mixed">Mixed traffic</option><option value="ddos">DDoS flood</option><option value="malware">Malware C2</option><option value="intrusion">Intrusion scan</option><option value="normal">Normal baseline</option></select>
+          <button class="primary" id="simBtn" onclick="toggleSim()"><i class="ti ti-player-play" style="font-size:12px"></i> Start</button>
+          <button onclick="clearSim()"><i class="ti ti-trash" style="font-size:12px"></i> Clear</button>
+        </div>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--color-text-secondary);padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:8px;display:flex;gap:16px;">
+        <span style="width:80px;">TIME</span><span style="width:130px;">SRC IP</span><span style="width:130px;">DST IP</span><span style="width:60px;">PROTO</span><span style="width:60px;">LEN</span><span style="width:70px;">SCORE</span><span>VERDICT</span>
+      </div>
+      <div id="simFeed" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-chart-line" aria-hidden="true"></i>Live anomaly score stream</div>
+      <div style="position:relative;width:100%;height:160px;"><canvas id="chartLive" role="img" aria-label="Live line chart of anomaly scores">Live anomaly score stream</canvas></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const DATA = {
+  attackCounts: {DDoS:13428, Malware:13307, Intrusion:13265},
+  protocolCounts: {ICMP:13429, UDP:13299, TCP:13272},
+  trafficCounts: {DNS:13376, HTTP:13360, FTP:13264},
+  severityCounts: {Medium:13435, High:13382, Low:13183},
+  actionCounts: {Blocked:13529, Ignored:13276, Logged:13195},
+  networkSegment: {'Segment A':13273,'Segment B':13319,'Segment C':13408},
+  hourlyDDoS: [604,567,559,555,574,575,552,558,546,564,563,552,581,567,556,562,544,584,551,557,570,582,564,576],
+  hourlyMalware: [558,572,554,558,553,561,564,544,555,550,554,543,558,533,549,556,564,559,567,577,552,566,551,567],
+  hourlyIntrusion: [538,557,545,570,546,562,544,558,570,574,553,553,537,558,570,565,568,546,565,544,556,547,553,565],
+  anomalyByAttack: {
+    DDoS: [1368,1336,1328,1318,1349,1320,1343,1349,1356,1361],
+    Malware: [1358,1345,1310,1316,1325,1344,1340,1310,1354,1405],
+    Intrusion: [1339,1305,1348,1306,1320,1338,1329,1337,1342,1301],
+  },
+  featureImportance: {
+    'Destination Port': 0.8898, 'Anomaly Scores': 0.0906,
+    'Packet Length': 0.0137, 'Traffic Type': 0.0016,
+    'Protocol': 0.0014, 'Packet Type': 0.0012,
+    'Source Port': 0.001, 'Severity Level': 0.0007
+  },
+  sampleRows: [
+    {src:'103.216.15.12',dst:'192.168.1.5',proto:'ICMP',attack:'Malware',severity:'Low',score:28.67,action:'Logged'},
+    {src:'78.199.217.198',dst:'10.0.0.12',proto:'ICMP',attack:'Malware',severity:'Low',score:51.5,action:'Blocked'},
+    {src:'63.79.210.48',dst:'172.16.0.3',proto:'UDP',attack:'DDoS',severity:'Low',score:87.42,action:'Blocked'},
+    {src:'45.33.32.156',dst:'192.168.0.1',proto:'UDP',attack:'Malware',severity:'Medium',score:15.79,action:'Ignored'},
+    {src:'198.51.100.22',dst:'10.10.1.5',proto:'TCP',attack:'DDoS',severity:'Low',score:0.52,action:'Logged'},
+    {src:'203.0.113.45',dst:'172.16.5.2',proto:'ICMP',attack:'Intrusion',severity:'High',score:92.3,action:'Blocked'},
+    {src:'185.220.101.3',dst:'10.0.5.8',proto:'TCP',attack:'Intrusion',severity:'High',score:78.1,action:'Blocked'},
+    {src:'91.108.4.200',dst:'192.168.2.10',proto:'UDP',attack:'DDoS',severity:'Medium',score:65.4,action:'Ignored'},
+  ]
+};
+
+function switchTab(tab) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+  event.target.classList.add('active');
+  if(tab === 'models') renderModels();
+  if(tab === 'traffic') renderTraffic();
+  if(tab === 'realtime') initLiveChart();
+}
+
+const chartInstances = {};
+function mkChart(id, cfg) {
+  if(chartInstances[id]) chartInstances[id].destroy();
+  chartInstances[id] = new Chart(document.getElementById(id), cfg);
+  return chartInstances[id];
+}
+
+function renderOverview() {
+  mkChart('chartAttackDist', {
+    type:'doughnut',
+    data:{labels:['DDoS','Malware','Intrusion'],datasets:[{data:[13428,13307,13265],backgroundColor:['#E24B4A','#BA7517','#534AB7'],borderWidth:2,borderColor:'var(--color-background-primary)'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw.toLocaleString()}`}}}}
+  });
+
+  mkChart('chartSeverityAction', {
+    type:'bar',
+    data:{
+      labels:['High','Medium','Low'],
+      datasets:[
+        {label:'Blocked',data:[4513,4515,4501],backgroundColor:'#E24B4A',borderRadius:3},
+        {label:'Logged',data:[4467,4391,4337],backgroundColor:'#185FA5',borderRadius:3},
+        {label:'Ignored',data:[4402,4529,4345],backgroundColor:'#888780',borderRadius:3},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:11}}},y:{ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.08)'}}}},
+  });
+
+  mkChart('chartHourly', {
+    type:'line',
+    data:{
+      labels:Array.from({length:24},(_,i)=>i+':00'),
+      datasets:[
+        {label:'DDoS',data:DATA.hourlyDDoS,borderColor:'#E24B4A',backgroundColor:'rgba(226,75,74,0.08)',tension:0.4,pointRadius:0,fill:true},
+        {label:'Malware',data:DATA.hourlyMalware,borderColor:'#BA7517',backgroundColor:'rgba(186,117,23,0.08)',tension:0.4,pointRadius:0,fill:true},
+        {label:'Intrusion',data:DATA.hourlyIntrusion,borderColor:'#534AB7',backgroundColor:'rgba(83,74,183,0.06)',tension:0.4,pointRadius:0,fill:true},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10},autoSkip:true,maxTicksLimit:12}},y:{ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.08)'}}}}
+  });
+
+  mkChart('chartProtocol', {
+    type:'doughnut',
+    data:{labels:['ICMP','UDP','TCP'],datasets:[{data:[13429,13299,13272],backgroundColor:['#378ADD','#1D9E75','#D4537E'],borderWidth:2,borderColor:'var(--color-background-primary)'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw.toLocaleString()}`}}}}
+  });
+
+  const tl = document.getElementById('threatList');
+  tl.innerHTML = '';
+  DATA.sampleRows.forEach(r => {
+    const badgeClass = r.attack === 'DDoS' ? 'badge-ddos' : r.attack === 'Malware' ? 'badge-malware' : 'badge-intrusion';
+    const sevClass = r.severity === 'High' ? 'badge-high' : r.severity === 'Medium' ? 'badge-medium' : 'badge-low';
+    const actClass = r.action === 'Blocked' ? 'badge-blocked' : r.action === 'Logged' ? 'badge-logged' : 'badge-ignored';
+    const scoreColor = r.score > 70 ? '#E24B4A' : r.score > 40 ? '#BA7517' : '#639922';
+    tl.innerHTML += `<div class="threat-row">
+      <span class="threat-ip">${r.src}</span>
+      <span style="font-size:12px;color:var(--color-text-secondary)">→</span>
+      <span class="threat-ip">${r.dst}</span>
+      <span style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono);">${r.proto}</span>
+      <span class="badge ${badgeClass}">${r.attack}</span>
+      <span class="badge ${sevClass}">${r.severity}</span>
+      <div class="score-bar-wrap">
+        <div class="score-bar-track"><div class="score-bar-fill" style="width:${r.score}%;background:${scoreColor};"></div></div>
+      </div>
+      <span style="font-size:11px;font-weight:500;color:${scoreColor};width:36px;">${r.score.toFixed(1)}</span>
+      <span class="badge ${actClass}">${r.action}</span>
+    </div>`;
+  });
+}
+
+function renderModels() {
+  const fi = document.getElementById('featImportance');
+  fi.innerHTML = '';
+  Object.entries(DATA.featureImportance).sort((a,b)=>b[1]-a[1]).forEach(([name, val]) => {
+    const pct = (val * 100).toFixed(1);
+    fi.innerHTML += `<div class="feat-row">
+      <span class="feat-name">${name}</span>
+      <div class="feat-bar-track"><div class="feat-bar-fill" style="width:${Math.min(val*110,100)}%;"></div></div>
+      <span class="feat-val">${pct}%</span>
+    </div>`;
+  });
+
+  const aeData = {
+    labels: Array.from({length:50},(_,i)=>i),
+    datasets: [
+      {label:'Normal',data:Array.from({length:50},()=>Math.max(0,0.018+Math.random()*0.015-0.007)),borderColor:'#639922',backgroundColor:'rgba(99,153,34,0.15)',tension:0.3,pointRadius:2},
+      {label:'DDoS',data:Array.from({length:50},()=>Math.max(0.05,0.183+Math.random()*0.08-0.04)),borderColor:'#E24B4A',backgroundColor:'rgba(226,75,74,0.1)',tension:0.3,pointRadius:2},
+      {label:'Malware',data:Array.from({length:50},()=>Math.max(0.05,0.247+Math.random()*0.09-0.045)),borderColor:'#BA7517',backgroundColor:'rgba(186,117,23,0.1)',tension:0.3,pointRadius:2},
+      {label:'Intrusion',data:Array.from({length:50},()=>Math.max(0.05,0.22+Math.random()*0.08-0.04)),borderColor:'#534AB7',backgroundColor:'rgba(83,74,183,0.08)',tension:0.3,pointRadius:2},
+    ]
+  };
+  mkChart('chartAE', {
+    type:'line',
+    data:aeData,
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw.toFixed(3)}`}}},
+      scales:{x:{display:false},y:{title:{display:true,text:'Reconstruction Error (MSE)',font:{size:10}},ticks:{font:{size:10}},grid:{color:'rgba(128,128,128,0.08)'}}}},
+    plugins:[{id:'threshold',afterDraw(chart){const{ctx,chartArea,scales}=chart;const y=scales.y.getPixelForValue(0.07);ctx.save();ctx.setLineDash([4,4]);ctx.strokeStyle='#E24B4A';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(chartArea.left,y);ctx.lineTo(chartArea.right,y);ctx.stroke();ctx.fillStyle='#E24B4A';ctx.font='10px sans-serif';ctx.fillText('threshold=0.07',chartArea.left+4,y-4);ctx.restore();}}]
+  });
+}
+
+function renderTraffic() {
+  const bins = ['0-10','10-20','20-30','30-40','40-50','50-60','60-70','70-80','80-90','90-100'];
+  mkChart('chartAnomalyDist', {
+    type:'bar',
+    data:{labels:bins,datasets:[
+      {label:'DDoS',data:DATA.anomalyByAttack.DDoS,backgroundColor:'rgba(226,75,74,0.8)',borderRadius:2},
+      {label:'Malware',data:DATA.anomalyByAttack.Malware,backgroundColor:'rgba(186,117,23,0.8)',borderRadius:2},
+      {label:'Intrusion',data:DATA.anomalyByAttack.Intrusion,backgroundColor:'rgba(83,74,183,0.7)',borderRadius:2},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:false,ticks:{font:{size:10}}},y:{ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.08)'}}}}
+  });
+
+  mkChart('chartPacketLen', {
+    type:'bar',
+    data:{labels:['DDoS','Malware','Intrusion'],datasets:[
+      {label:'Min',data:[64,64,64],backgroundColor:'#B5D4F4',borderRadius:3},
+      {label:'Q1',data:[372,370,369],backgroundColor:'#378ADD',borderRadius:3},
+      {label:'Median',data:[756,757,757],backgroundColor:'#185FA5',borderRadius:3},
+      {label:'Q3',data:[1143,1143,1145],backgroundColor:'#0C447C',borderRadius:3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:11}}},y:{title:{display:true,text:'Packet Length (bytes)',font:{size:10}},ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.08)'}}}}
+  });
+
+  mkChart('chartSegment', {
+    type:'doughnut',
+    data:{labels:['Segment A','Segment B','Segment C'],datasets:[{data:[13273,13319,13408],backgroundColor:['#378ADD','#E24B4A','#534AB7'],borderWidth:2,borderColor:'var(--color-background-primary)'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{display:false}}}
+  });
+
+  mkChart('chartHeatmap', {
+    type:'bar',
+    data:{labels:['DNS','HTTP','FTP'],datasets:[
+      {label:'DDoS',data:[4471,4476,4481],backgroundColor:'#E24B4A',borderRadius:3},
+      {label:'Malware',data:[4445,4441,4421],backgroundColor:'#BA7517',borderRadius:3},
+      {label:'Intrusion',data:[4460,4443,4362],backgroundColor:'#534AB7',borderRadius:3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:11}}},y:{ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.08)'}},}},
+  });
+}
+
+let simRunning = false, simTimer = null, simCount = 0, blockedCount = 0, anomalySum = 0;
+const randomIP = () => `${Math.floor(Math.random()*220+10)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*254+1)}`;
+const protos = ['TCP','UDP','ICMP'];
+
+let liveChart = null, liveData = [];
+function initLiveChart() {
+  if(liveChart) return;
+  liveData = Array(60).fill(null);
+  liveChart = mkChart('chartLive', {
+    type:'line',
+    data:{
+      labels:Array(60).fill(''),
+      datasets:[{
+        label:'Anomaly Score',data:[...liveData],
+        borderColor:'#E24B4A',backgroundColor:'rgba(226,75,74,0.08)',
+        tension:0.4,pointRadius:0,fill:true,borderWidth:1.5
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{legend:{display:false}},
+      scales:{x:{display:false},y:{min:0,max:100,ticks:{font:{size:10}},grid:{color:'rgba(128,128,128,0.08)'}}}
+    }
+  });
+}
+
+function genPacket(mode) {
+  const modes = {
+    ddos:{attacks:['DDoS'],weights:[1]},
+    malware:{attacks:['Malware'],weights:[1]},
+    intrusion:{attacks:['Intrusion'],weights:[1]},
+    normal:{attacks:['Normal'],weights:[1]},
+    mixed:{attacks:['DDoS','Malware','Intrusion','Normal'],weights:[0.33,0.33,0.27,0.07]},
+  };
+  const {attacks} = modes[mode];
+  const attack = attacks[Math.floor(Math.random()*attacks.length)];
+  const isNormal = attack === 'Normal';
+  const score = isNormal ? Math.random()*15 : Math.min(99.9, 30 + Math.random()*65 + (attack==='Malware'?10:0));
+  const verdict = isNormal ? 'ALLOW' : score > 50 ? 'BLOCK' : 'LOG';
+  const proto = protos[Math.floor(Math.random()*3)];
+  const now = new Date();
+  return {
+    time: `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}.${now.getMilliseconds().toString().slice(0,2)}`,
+    src: randomIP(), dst: randomIP(), proto, len: Math.floor(Math.random()*1400)+64,
+    score, attack, verdict, isNormal,
+  };
+}
+
+function toggleSim() {
+  if(!simRunning) {
+    simRunning = true;
+    document.getElementById('simBtn').innerHTML = '<i class="ti ti-player-pause" style="font-size:12px"></i> Pause';
+    const mode = document.getElementById('simMode').value;
+    simTimer = setInterval(() => {
+      const p = genPacket(mode);
+      simCount++;
+      if(!p.isNormal) document.getElementById('rtThreats').textContent = parseInt(document.getElementById('rtThreats').textContent||0)+1;
+      if(p.verdict === 'BLOCK') { blockedCount++; document.getElementById('rtBlocked').textContent = blockedCount; }
+      anomalySum += p.score;
+      document.getElementById('rtAnomaly').textContent = (anomalySum/simCount).toFixed(1);
+      document.getElementById('rtPps').textContent = Math.floor(8 + Math.random()*12);
+
+      const feed = document.getElementById('simFeed');
+      const typeClass = p.isNormal ? 'ev-normal' : p.attack==='DDoS' ? 'ev-ddos' : p.attack==='Malware' ? 'ev-malware' : 'ev-intrusion';
+      const verdictColor = p.verdict==='BLOCK' ? '#E24B4A' : p.verdict==='LOG' ? '#185FA5' : '#3B6D11';
+      const scoreColor = p.score>70?'#E24B4A':p.score>40?'#BA7517':'#639922';
+      const el = document.createElement('div');
+      el.className = `sim-event ${typeClass}`;
+      el.innerHTML = `<span class="sim-time">${p.time}</span><span class="sim-ip" style="width:130px;">${p.src}</span><span class="sim-ip" style="width:130px;">${p.dst}</span><span style="width:60px;font-size:11px;">${p.proto}</span><span style="width:60px;font-size:11px;">${p.len}</span><span style="width:70px;font-size:11px;font-weight:500;color:${scoreColor};">${p.score.toFixed(1)}</span><span class="badge" style="background:none;color:${verdictColor};font-weight:500;">${p.verdict}${p.isNormal?'':' · '+p.attack}</span>`;
+      feed.insertBefore(el, feed.firstChild);
+      if(feed.children.length > 50) feed.removeChild(feed.lastChild);
+
+      if(liveChart) {
+        liveData.push(p.score);
+        if(liveData.length > 60) liveData.shift();
+        liveChart.data.datasets[0].data = [...liveData];
+        liveChart.update();
+      }
+    }, 300);
+  } else {
+    simRunning = false;
+    clearInterval(simTimer);
+    document.getElementById('simBtn').innerHTML = '<i class="ti ti-player-play" style="font-size:12px"></i> Start';
+  }
+}
+
+function clearSim() {
+  simRunning = false; clearInterval(simTimer);
+  document.getElementById('simBtn').innerHTML = '<i class="ti ti-player-play" style="font-size:12px"></i> Start';
+  document.getElementById('simFeed').innerHTML = '';
+  simCount=0; blockedCount=0; anomalySum=0;
+  document.getElementById('rtThreats').textContent='0';
+  document.getElementById('rtBlocked').textContent='0';
+  document.getElementById('rtPps').textContent='0';
+  document.getElementById('rtAnomaly').textContent='—';
+  if(liveChart){liveData=Array(60).fill(null);liveChart.data.datasets[0].data=[...liveData];liveChart.update();}
+}
+
+renderOverview();
+</script>
