@@ -1,28 +1,3 @@
-"""
-ids_realtime.py
-────────────────────────────────────────────────────────────────────────────
-Real-time intrusion detection using Scapy for packet capture.
-
-Usage
------
-  sudo python ids_realtime.py [--iface eth0] [--mode xgboost|ensemble]
-
-Requirements
-------------
-  pip install scapy
-  Must be run as root (or with CAP_NET_RAW) for live capture.
-  If no NIC is available, pass --demo to use synthetic packets.
-
-How it works
-------------
-  1. Scapy sniffs each packet from the network interface.
-  2. A feature vector is extracted (port numbers, length, protocol, …).
-  3. The pre-trained XGBoost / Isolation Forest / Autoencoder models
-     are loaded and predict: Normal or Attack.
-  4. Alerts are printed in SIEM style and appended to ids_alerts.jsonl.
-  5. A rolling stats summary is printed every N packets.
-"""
-
 import argparse
 import json
 import sys
@@ -65,7 +40,7 @@ def extract_features(pkt) -> np.ndarray | None:
             return None
 
         ip   = pkt[IP]
-        proto_num = ip.proto                          # 1=ICMP, 6=TCP, 17=UDP
+        proto_num = ip.proto                          
         proto_enc = {1: 0, 6: 2, 17: 1}.get(proto_num, 0)
 
         pkt_len = len(pkt)
@@ -81,9 +56,9 @@ def extract_features(pkt) -> np.ndarray | None:
         else:
             src_port = 0
             dst_port = 0
-            pkt_type = 0  # Control (ICMP)
+            pkt_type = 0  
 
-        # Heuristic anomaly score: unusual port + large payload
+        
         anomaly = 0.0
         if dst_port not in COMMON_PORTS and dst_port != 0:
             anomaly += 30
@@ -93,7 +68,7 @@ def extract_features(pkt) -> np.ndarray | None:
             anomaly += 20
         anomaly = min(anomaly + np.random.uniform(0, 10), 100.0)
 
-        # traffic_type_enc: DNS=0, FTP=1, HTTP=2 (heuristic)
+        
         if dst_port == 53 or src_port == 53:
             traffic_enc = 0
         elif dst_port in {20, 21}:
@@ -101,15 +76,15 @@ def extract_features(pkt) -> np.ndarray | None:
         else:
             traffic_enc = 2
 
-        # severity_enc: Low=0, Medium=1, High=2 (derived from anomaly)
+        
         severity_enc = 0 if anomaly < 33 else (1 if anomaly < 66 else 2)
 
-        # network_segment_enc: 0/1/2 from last octet of src ip
+        
         last_oct = int(str(ip.src).split(".")[-1])
         seg_enc  = last_oct % 3
 
-        # action_taken_enc: for feature parity (will be predicted, not known)
-        action_enc = 1  # "Logged" as default placeholder
+        
+        action_enc = 1  
 
         port_ratio   = src_port / (dst_port + 1)
         len_per_port = pkt_len / (dst_port + 1)
@@ -135,8 +110,6 @@ def extract_features(pkt) -> np.ndarray | None:
         return None
 
 
-# ─── IDS Engine ───────────────────────────────────────────────────────────────
-
 class IDSEngine:
     def __init__(self, mode: str = "ensemble"):
         self.mode   = mode
@@ -146,7 +119,7 @@ class IDSEngine:
 
         from utils.autoencoder import NumpyAutoencoder
         self.ae       = NumpyAutoencoder.load(MODELS_DIR / "autoencoder.npz")
-        self.ae_thresh = 0.07   # saved separately; adjust after training
+        self.ae_thresh = 0.07  
 
         self.counts  = {"total": 0, "attack": 0, "normal": 0, "blocked": 0}
         self.start_t = time.time()
@@ -169,7 +142,7 @@ class IDSEngine:
             verdict = iso_p
         elif self.mode == "autoencoder":
             verdict = ae_p
-        else:  # ensemble majority vote
+        else: 
             verdict = int((xgb_p + iso_p + ae_p) >= 2)
 
         return {
@@ -201,7 +174,7 @@ class IDSEngine:
             action = "ALLOW"
             colour = GRN
 
-        # Console output
+  
         print(
             f"{colour}[{ts}] {action:5s}{RST}  "
             f"{meta['src_ip']:>15}:{meta['src_port']:<5}  →  "
@@ -210,7 +183,7 @@ class IDSEngine:
             f"score={meta['anomaly']:5.1f}  xgb={pred['xgb_prob']:.3f}  ae={pred['ae_error']:.4f}"
         )
 
-        # JSON log
+        
         event = {
             "timestamp": datetime.now().isoformat(),
             "action":    action,
@@ -220,7 +193,7 @@ class IDSEngine:
         with open(ALERT_LOG, "a") as f:
             f.write(json.dumps(event) + "\n")
 
-        # Rolling stats every 100 packets
+       
         if self.counts["total"] % 100 == 0:
             elapsed  = time.time() - self.start_t
             pps      = self.counts["total"] / elapsed
@@ -232,7 +205,6 @@ class IDSEngine:
             )
 
 
-# ─── Demo mode (no NIC required) ─────────────────────────────────────────────
 
 def run_demo(engine: IDSEngine, n: int = 300, delay: float = 0.15):
     """Synthetic packet generator for environments without a NIC."""
@@ -256,7 +228,7 @@ def run_demo(engine: IDSEngine, n: int = 300, delay: float = 0.15):
         time.sleep(delay)
 
 
-# ─── Entry point ─────────────────────────────────────────────────────────────
+
 
 def main():
     ap = argparse.ArgumentParser(description="AI-IDS real-time packet analyser")
