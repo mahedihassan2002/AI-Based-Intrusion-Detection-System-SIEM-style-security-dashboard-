@@ -1,0 +1,20 @@
+# AI-Based Intrusion Detection System
+# Python 3.10+
+
+# Core ML
+scikit-learn>=1.4.0
+xgboost>=2.0.0
+numpy>=1.26.0
+pandas>=2.1.0
+joblib>=1.3.0
+
+# Dashboard (SIEM)
+streamlit>=1.32.0
+plotly>=5.20.0
+
+# Real-time packet capture (requires root / CAP_NET_RAW)
+scapy>=2.5.0
+
+# Optional: deep learning autoencoder alternative
+# tensorflow>=2.15.0      # heavyweight — our NumPy AE is the default
+# torch>=2.2.0            # PyTorch alternative
