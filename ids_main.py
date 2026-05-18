@@ -1,11 +1,3 @@
-"""
-AI-Based Intrusion Detection System
-====================================
-Dataset : cybersecurity_attacks.csv (Kaggle, 40 000 records)
-Models  : Isolation Forest | XGBoost | Autoencoder (Keras/PyTorch-free NumPy AE)
-Output  : trained model artefacts + dashboard_data.json for the SIEM dashboard
-"""
-
 import json
 import warnings
 warnings.filterwarnings("ignore")
